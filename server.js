@@ -7,19 +7,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Serve User Interfaces safely from absolute path roots
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/stations.json', (req, res) => res.sendFile(path.join(__dirname, 'stations.json')));
-
-// Expose static track data mapping safely
-app.get('/railway_tracks.geojson', (req, res) => {
-    const geoPath = path.join(__dirname, 'railway_tracks.geojson');
-    if (fs.existsSync(geoPath)) {
-        res.sendFile(geoPath);
-    } else {
-        res.status(404).json({ error: "railway_tracks.geojson file missing from deployment root directory." });
-    }
-});
 
 let stationRegistry = {}; 
 let fullTrainSchedules = {}; 
@@ -35,7 +24,6 @@ function initializeNationalNetwork() {
             throw new Error(`Critical dataset alignment failure. Verified paths -> Stations: ${fs.existsSync(stationsPath)}, Schedules: ${fs.existsSync(schedulesPath)}`);
         }
 
-        // 1. Parse Stations with explicit absolute file path bindings
         const stationsData = JSON.parse(fs.readFileSync(stationsPath, 'utf8'));
         (stationsData.features || []).forEach(feat => {
             if (!feat || !feat.geometry || !feat.geometry.coordinates || !feat.properties) return;
@@ -51,7 +39,6 @@ function initializeNationalNetwork() {
             }
         });
 
-        // 2. Parse Schedules with explicit absolute file path bindings
         const schedules = JSON.parse(fs.readFileSync(schedulesPath, 'utf8'));
         schedules.forEach(stop => {
             if (!stop.train_number || !stop.station_code) return;
@@ -148,8 +135,9 @@ function haversineDistance(s1, s2) {
     const dLat = (s2.lat - s1.lat) * Math.PI / 180;
     const dLng = (s2.lng - s1.lng) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(s1.lat * Math.PI / 180) * Math.cos(s2.lat * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+              `Math.cos(s1.lat * Math.PI / 180) * Math.cos(s2.lat * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2)`;
+    const v = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(s1.lat * Math.PI / 180) * Math.cos(s2.lat * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
+    return R * (2 * Math.atan2(Math.sqrt(v), Math.sqrt(1-v)));
 }
 
 app.listen(PORT, () => initializeNationalNetwork());
