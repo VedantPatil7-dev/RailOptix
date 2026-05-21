@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RailOptix — National Timetable Dispatch Center</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-blue: #0284C7;
+            --primary-dark: #0369A1;
+            --slate-base: #0F172A;
+            --slate-card: #FFFFFF;
+            --slate-text: #334155;
+            --muted-gray: #64748B;
+            --bg-light: #F8FAFC;
+            --border-color: #E2E8F0;
+            --neon-green: #10B981;
+            --orange-alert: #F97316;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0; padding: 0; background-color: var(--bg-light);
+            display: flex; flex-direction: column; height: 100vh;
+            color: var(--slate-base); overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white;
+            padding: 14px 24px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 1010; border-bottom: 1px solid #334155;
+        }
+
+        header h1 { margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        header h1 span { background-color: #334155; color: #38BDF8; font-size: 10px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+
+        .system-status { font-size: 11px; font-weight: 700; color: #34D399; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; background-color: #34D399; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #34D399; }
+
+        .main-wrapper { display: flex; flex: 1; height: calc(100vh - 51px); position: relative; }
+
+        .sidebar {
+            width: 390px; background: var(--slate-card); padding: 24px;
+            box-shadow: 4px 0 30px rgba(15, 23, 42, 0.04); display: flex;
+            flex-direction: column; gap: 18px; overflow-y: auto;
+            border-right: 1px solid var(--border-color); box-sizing: border-box;
+        }
+
+        .panel-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--slate-base); }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: 700; font-size: 11px; color: var(--muted-gray); text-transform: uppercase; }
+
+        input.search-input {
+            padding: 12px 14px; border-radius: 8px; border: 1.5px solid var(--border-color);
+            font-size: 14px; outline: none; background-color: #F8FAFC; color: var(--slate-base);
+            width: 100%; box-sizing: border-box; transition: all 0.2s ease;
+        }
+        input.search-input:focus { border-color: var(--primary-blue); background-color: #FFFFFF; box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.12); }
+
+        .btn-search {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-dark) 100%);
+            color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700;
+            cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2); font-family: inherit;
+        }
+        .btn-search:hover { background: linear-gradient(135deg, var(--primary-dark) 0%, #025a87 100%); }
+
+        .trains-list-box { display: none; flex-direction: column; gap: 10px; margin-top: 5px; }
+        .list-header-text { font-size: 11px; font-weight: 800; color: var(--muted-gray); text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .train-item-card {
+            background: #F8FAFC; border: 1.5px solid var(--border-color); border-radius: 8px;
+            padding: 12px 14px; cursor: pointer; transition: all 0.2s ease; display: flex;
+            flex-direction: column; gap: 4px; position: relative;
+        }
+        .train-item-card:hover { border-color: var(--primary-blue); background: #F0F9FF; transform: translateY(-1px); }
+        .train-item-card.active { border-color: var(--neon-green); background: #E6F4F1; }
+        .train-item-card.hop-variant { border-left: 4px solid var(--orange-alert); }
+        
+        .card-row-one { display: flex; justify-content: space-between; align-items: center; }
+        .card-train-identity { font-weight: 700; font-size: 12.5px; color: var(--slate-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; }
+        .card-train-day { font-size: 10px; font-weight: 800; background: #E2E8F0; padding: 2px 6px; border-radius: 4px; color: var(--slate-text); }
+        .card-row-two { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted-gray); font-weight: 600; margin-top: 2px; }
+        .card-row-two span strong { color: var(--slate-text); }
+
+        .floating-watermark-card {
+            position: absolute; bottom: 20px; right: 20px; width: 320px;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+            backdrop-filter: blur(8px); border: 1px solid #334155; border-radius: 8px;
+            padding: 14px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); color: #FFFFFF; z-index: 1000;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .floating-watermark-card .bg-stamp { position: absolute; right: -8px; bottom: -8px; font-size: 32px; opacity: 0.05; font-weight: 900; color: #38BDF8; transform: rotate(-12deg); pointer-events: none; user-select: none; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px);
+            z-index: 2000; display: none; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; border-radius: 12px; width: 480px; max-width: 90%;
+            padding: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; gap: 14px; animation: slideUp 0.2s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(15px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+        .modal-title-main { font-size: 15px; font-weight: 700; color: var(--slate-base); margin: 0; }
+        .modal-title-sub { font-size: 12px; color: var(--primary-blue); font-weight: 700; margin-top: 2px; }
+        .btn-close-modal { background: none; border: none; font-size: 20px; color: var(--muted-gray); cursor: pointer; font-weight: bold; padding: 0; }
+
+        .modal-metrics-strip { display: flex; gap: 20px; background: #F8FAFC; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; color: var(--slate-text); }
+        
+        .modal-halts-scroller { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 0; padding-left: 5px; }
+        .halt-timeline-node { display: flex; gap: 15px; position: relative; padding-bottom: 14px; }
+        .halt-timeline-node::before { content: ''; position: absolute; left: 5px; top: 14px; bottom: 0; width: 2px; background: #E2E8F0; }
+        .halt-timeline-node:last-child::before { display: none; }
+        
+        .node-indicator { width: 12px; height: 12px; background: white; border: 2.5px solid var(--primary-blue); border-radius: 50%; z-index: 5; margin-top: 3px; box-sizing: border-box; }
+        .halt-timeline-node.junc-marker .node-indicator { border-color: var(--orange-alert) !important; background: var(--orange-alert) !important; scale: 1.2; }
+        
+        .node-details { display: flex; flex-direction: column; font-size: 12.5px; }
+        .node-station-name { font-weight: 700; color: var(--slate-base); }
+        .node-timing-row { font-size: 11.5px; color: var(--muted-gray); font-weight: 600; }
+
+        .transfer-divider { background: #FFF7ED; border: 1px dashed var(--orange-alert); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; color: #C2410C; margin: 6px 0; text-align: center; }
+
+        .history-section { border-top: 1px dashed var(--border-color); padding-top: 14px; margin-top: auto; }
+        .history-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .btn-clear-history { font-size: 11px; background: none; border: none; color: #EF4444; cursor: pointer; font-weight: 600; padding: 0; text-transform: uppercase; }
+        .history-container { display: flex; flex-direction: column; gap: 6px; max-height: 100px; overflow-y: auto; }
+        .history-chip { background-color: var(--bg-light); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; color: var(--slate-text); font-weight: 500; }
+        .history-chip:hover { border-color: var(--primary-blue); background-color: #F0F9FF; }
+
+        #map { flex: 1; height: 100%; background: #CBD5E1; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>RailOptix <span>National Timetable Dispatch</span></h1>
+        <div class="system-status"><span class="status-dot"></span> Grid Core Online</div>
+    </header>
+
+    <div class="main-wrapper">
+        <div class="sidebar">
+            <h2 class="panel-title">Search Active Trains</h2>
+            
+            <div class="form-group">
+                <label>Departure Station</label>
+                <input type="text" id="fromStationInput" class="search-input" list="stationOptions" placeholder="Type source name or code...">
+            </div>
+            
+            <div class="form-group">
+                <label>Arrival Destination</label>
+                <input type="text" id="toStationInput" class="search-input" list="stationOptions" placeholder="Type destination name or code...">
+            </div>
+            
+            <datalist id="stationOptions"></datalist>
+            
+            <button class="btn-search" onclick="fetchAvailableTrains()">Scan Live Timetables</button>
+            
+            <div id="trainsListWrapper" class="trains-list-box">
+                <div class="list-header-text" id="resultsCountLabel">Available Options</div>
+                <div id="cardsContainer" style="display:flex; flex-direction:column; gap:10px;"></div>
+            </div>
+
+            <div class="history-section">
+                <div class="history-header-row">
+                    <label>Recent Enquiries</label>
+                    <button class="btn-clear-history" onclick="clearSearchHistory()">Clear All</button>
+                </div>
+                <div id="historyContainer" class="history-container"></div>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="floating-watermark-card">
+            <div class="bg-stamp">SDC</div>
+            <div style="font-size: 10px; font-weight: 800; color: #38BDF8; text-transform: uppercase; letter-spacing: 1px;">DESIGNED BY:</div>
+            <div style="font-size: 16px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.3px; margin: 2px 0 1px 0;">Vedant Patil</div>
+            <div style="font-size: 11px; font-weight: 600; color: #94A3B8; display: flex; flex-direction: column; gap: 2px; margin-top: 2px;">
+                <div><span style="color: #38BDF8;">🖥️ SYSTEM:</span> RailOptix™ National Route Optimization Node</div>
+                <div><span style="color: #38BDF8;">⚙️ DEPARTMENT:</span> Software Development Cell (SDC)</div>
+                <div style="font-size: 10px; color: #64748B; font-style: italic; margin-top: 2px;">FY B.Sc. Computer Science • Network Engineering Prototype</div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #334155; margin: 10px 0 6px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; color: #94A3B8;">
+                <span>⏱️ IR Operational Time:</span>
+                <span id="digitalRailwayClock" style="color: #34D399; font-family: monospace; background: #1E293B; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; font-size: 11px;">00:00:00 AM</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="modal-overlay" onclick="closeTimetableModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title-main" id="modalTrainTitle">Train Connection Itinerary</h3>
+                    <div class="modal-title-sub" id="modalTrainSub">Route Segment Breakdown</div>
+                </div>
+                <button class="btn-close-modal" onclick="closeTimetableModal(null)">&times;</button>
+            </div>
+            <div class="modal-metrics-strip">
+                <span>📐 Combined Scale: <strong id="modalDistance" style="color:var(--primary-blue)">0 KM</strong></span>
+                <span>⏱️ Full Transit: <strong id="modalDuration" style="color:var(--primary-blue)">0h 0m</strong></span>
+            </div>
+            <div style="font-weight: 700; font-size: 11.5px; color: var(--muted-gray); text-transform: uppercase; letter-spacing: 0.5px;">Itinerary Schedule Sequence:</div>
+            <div id="modalHaltsScroller" class="modal-halts-scroller"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([22.0, 78.0], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        let activeLayer = null;
+        let coordsCache = {};
+        let stationLookupMap = {}; 
+        let currentTrainsCache = []; 
+
+        async function bootstrapDashboard() {
+            try {
+                const res = await fetch('/api/list-stations');
+                const stations = await res.json();
+                const datalist = document.getElementById('stationOptions');
+                datalist.innerHTML = "";
+
+                stations.forEach(st => {
+                    const fullOptionString = `${st.name} (${st.code})`;
+                    const option = document.createElement('option');
+                    option.value = fullOptionString;
+                    datalist.appendChild(option);
+                    stationLookupMap[fullOptionString] = st.code;
+                });
+
+                const geoRes = await fetch('/stations.json');
+                const geoData = await geoRes.json();
+                (geoData.features || []).forEach(f => {
+                    if(f.geometry && f.properties?.code) {
+                        coordsCache[f.properties.code.toUpperCase().trim()] = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+                    }
+                });
+
+                renderHistoryPanel();
+                runRailwayClock();
+            } catch (err) {
+                console.error("Dashboard core initialization failed:", err);
+            }
+        }
+
+        async function fetchAvailableTrains(overrideFrom = null, overrideTo = null) {
+            const fromRaw = overrideFrom || document.getElementById('fromStationInput').value;
+            const toRaw = overrideTo || document.getElementById('toStationInput').value;
+
+            if (overrideFrom && overrideTo) {
+                document.getElementById('fromStationInput').value = overrideFrom;
+                document.getElementById('toStationInput').value = overrideTo;
+            }
+
+            const fromCode = stationLookupMap[fromRaw] || fromRaw.toUpperCase().trim();
+            const toCode = stationLookupMap[toRaw] || toRaw.toUpperCase().trim();
+
+            if (!fromCode || !toCode) {
+                alert("Please select valid station nodes from search selections.");
+                return;
+            }
+
+            const res = await fetch(`/api/find-direct-trains?from=${fromCode}&to=${toCode}`);
+            if(!res.ok) { 
+                alert("No scheduled direct or 1-hop connections found."); 
+                return; 
+            }
+            
+            const trainsList = await res.json();
+            currentTrainsCache = trainsList;
+
+            document.getElementById('trainsListWrapper').style.display = 'flex';
+            document.getElementById('resultsCountLabel').innerText = `${trainsList.length} Route Choices Located`;
+
+            const container = document.getElementById('cardsContainer');
+            container.innerHTML = "";
+
+            trainsList.forEach((train, idx) => {
+                const hrs = Math.floor(train.durationMins / 60);
+                const mins = train.durationMins % 60;
+                
+                const card = document.createElement('div');
+                card.className = `train-item-card ${train.isMultiHop ? 'hop-variant' : ''}`;
+                card.setAttribute('onclick', `selectTrainTrackRoute(${idx})`);
+                
+                card.innerHTML = `
+                    <div class="card-row-one">
+                        <div class="card-train-identity"> ${train.isMultiHop ? '⚡ [TRANSFER] ' : '🚂 '}${train.trainName}</div>
+                        <div class="card-train-day">${train.runningDay}</div>
+                    </div>
+                    <div class="card-row-two">
+                        <span>🛫 Dep: <strong>${train.departureTime}</strong></span>
+                        <span>🛬 Arr: <strong>${train.arrivalTime}</strong></span>
+                        <span>⏱️ <strong>${hrs}h ${mins}m</strong></span>
+                    </div>
+                    ${train.isMultiHop ? `<div style="font-size:10px; color:var(--orange-alert); font-weight:700; margin-top:2px;">Change trains at: ${train.junctionName}</div>` : ''}
+                `;
+                container.appendChild(card);
+            });
+
+            selectTrainTrackRoute(0, false);
+            saveSearchToHistory(fromRaw, toRaw);
+        }
+
+        function selectTrainTrackRoute(index, openModalFlag = true) {
+            const cards = document.getElementsByClassName('train-item-card');
+            for(let i=0; i<cards.length; i++) cards[i].classList.remove('active');
+            if(cards[index]) cards[index].classList.add('active');
+
+            const targetRoute = currentTrainsCache[index];
+            
+            if(activeLayer) map.removeLayer(activeLayer);
+            activeLayer = L.layerGroup().addTo(map);
+
+            let segmentsToRender = [];
+
+            if (targetRoute.isMultiHop) {
+                segmentsToRender.push({ halts: targetRoute.leg1Halts, color: '#0284C7' }); 
+                segmentsToRender.push({ halts: targetRoute.leg2Halts, color: '#F97316' }); 
+            } else {
+                segmentsToRender.push({ halts: targetRoute.allHaltsSequence, color: '#0F172A' }); 
+            }
+
+            let globalBoundsArray = [];
+
+            segmentsToRender.forEach(segment => {
+                let mapCoordinates = [];
+                
+                const stopsOnly = segment.halts.filter(halt => {
+                    const arr = String(halt.arrival).toUpperCase().trim();
+                    const dep = String(halt.departure).toUpperCase().trim();
+                    if (arr === dep && arr !== "ORIGIN" && arr !== "DESTINATION") return false;
+                    if (arr === "NONE" || dep === "NONE" || arr === "--" || dep === "--") return false;
+                    return true;
+                });
+
+                stopsOnly.forEach(halt => {
+                    const code = halt.stationCode.toUpperCase().trim();
+                    if(coordsCache[code]) {
+                        mapCoordinates.push(coordsCache[code]);
+                        globalBoundsArray.push(coordsCache[code]);
+
+                        const isJunc = (targetRoute.isMultiHop && code === targetRoute.junctionCode.toUpperCase().trim());
+                        L.circleMarker(coordsCache[code], {
+                            radius: isJunc ? 7 : 4.5,
+                            color: isJunc ? '#F97316' : segment.color, // Fixed CSS Variable syntax crash
+                            fillColor: '#FFFFFF',
+                            fillOpacity: 1,
+                            weight: isJunc ? 3.5 : 2
+                        }).addTo(activeLayer)
+                          .bindPopup(`<b>${halt.stationName} (${code})</b><br>📥 Arr: ${halt.arrival} | 📤 Dep: ${halt.departure}`);
+                    }
+                });
+
+                L.polyline(mapCoordinates, { color: segment.color, weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(activeLayer);
+                L.polyline(mapCoordinates, { color: '#FFFFFF', weight: 1.5, dashArray: '5,5', lineJoin: 'round' }).addTo(activeLayer);
+            });
+
+            if (globalBoundsArray.length > 0) {
+                map.fitBounds(L.polyline(globalBoundsArray).getBounds(), { padding: [60, 60] });
+            }
+
+            if (openModalFlag) {
+                openTimetableModalPopup(targetRoute);
+            }
+        }
+
+        function openTimetableModalPopup(route) {
+            document.getElementById('modalTrainTitle').innerText = route.trainName;
+            document.getElementById('modalTrainSub').innerText = `Itinerary Code Matrix: ${route.trainNumber}`;
+            document.getElementById('modalDistance').innerText = `${route.distanceKM} KM`;
+            
+            const hrs = Math.floor(route.durationMins / 60);
+            const mins = route.durationMins % 60;
+            document.getElementById('modalDuration').innerText = `${hrs}h ${mins}m`;
+
+            const scroller = document.getElementById('modalHaltsScroller');
+            scroller.innerHTML = "";
+
+            const appendHaltNodes = (haltsArray, isJuncCode = null) => {
+                const filtered = haltsArray.filter(h => {
+                    if(h.arrival === h.departure && h.arrival !== "ORIGIN" && h.arrival !== "DESTINATION") return false;
+                    return h.arrival !== "NONE" && h.arrival !== "--";
+                });
+
+                filtered.forEach(halt => {
+                    const node = document.createElement('div');
+                    const matchJunc = (isJuncCode && halt.stationCode.toUpperCase().trim() === isJuncCode.toUpperCase().trim());
+                    node.className = `halt-timeline-node ${matchJunc ? 'junc-marker' : ''}`;
+                    
+                    node.innerHTML = `
+                        <div class="node-indicator"></div>
+                        <div class="node-details">
+                            <div class="node-station-name">${halt.stationName} (${halt.stationCode}) ${matchJunc ? '🧡 [TRANSFER HUB]' : ''}</div>
+                            <div class="node-timing-row">📅 Day ${halt.day} • 📥 Arr: ${halt.arrival} | 📤 Dep: ${halt.departure}</div>
+                        </div>
+                    `;
+                    scroller.appendChild(node);
+                });
+            };
+
+            if (route.isMultiHop) {
+                appendHaltNodes(route.leg1Halts, route.junctionCode);
+                
+                const transferBanner = document.createElement('div');
+                transferBanner.className = "transfer-divider";
+                transferBanner.innerHTML = `⚠️ ARRIVE AT TRANSFER HUB — LAYOVER INTERMISSION: 45 MINS`;
+                scroller.appendChild(transferBanner);
+
+                appendHaltNodes(route.leg2Halts, route.junctionCode);
+            } else {
+                appendHaltNodes(route.allHaltsSequence);
+            }
+
+            document.getElementById('detailsModal').style.display = 'flex';
+        }
+
+        function closeTimetableModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        function saveSearchToHistory(from, to) {
+            if(!from || !to) return;
+            let currentHistory = JSON.parse(localStorage.getItem('railoptix_history')) || [];
+            const queryLabel = `${from} ➔ ${to}`;
+            currentHistory = currentHistory.filter(item => `${item.from} ➔ ${item.to}` !== queryLabel);
+            currentHistory.unshift({ from, to });
+            if(currentHistory.length > 4) currentHistory.pop();
+            localStorage.setItem('railoptix_history', JSON.stringify(currentHistory));
+            renderHistoryPanel();
+        }
+
+        function renderHistoryPanel() {
+            const container = document.getElementById('historyContainer');
+            container.innerHTML = "";
+            const currentHistory = JSON.parse(localStorage.getItem('railoptix_history')) || [];
+            if(currentHistory.length === 0) {
+                container.innerHTML = `<div style="font-size:12px; color:var(--muted-gray); font-style:italic; padding:4px 0;">No queries recorded.</div>`;
+                return;
+            }
+            currentHistory.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = "history-chip";
+                chip.setAttribute('onclick', `fetchAvailableTrains("${item.from}", "${item.to}")`);
+                chip.innerHTML = `
+                    <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 92%;">
+                        <span>🕒 ${item.from.split('(')[0].trim()}</span> <span style="color:var(--muted-gray)">➔</span> <span>${item.to.split('(')[0].trim()}</span>
+                    </div>
+                    <span style="color:var(--primary-blue); font-weight:bold; font-size:10px;">➔</span>
+                `;
+                container.appendChild(chip);
+            });
+        }
+
+        function clearSearchHistory() {
+            localStorage.removeItem('railoptix_history');
+            renderHistoryPanel();
+        }
+
+        function runRailwayClock() {
+            const clockEl = document.getElementById('digitalRailwayClock');
+            if (!clockEl) return;
+            const updateTime = () => {
+                const now = new Date();
+                let hours = now.getHours();
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12; hours = hours ? hours : 12; 
+                clockEl.innerText = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+            };
+            updateTime(); setInterval(updateTime, 1000);
+        }
+
+        bootstrapDashboard();
+    </script>
+</body>
+</html>

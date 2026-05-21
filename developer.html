@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RailOptix — Infrastructure Control Console</title>
+    <style>
+        :root {
+            --slate-base: #0F172A;
+            --slate-card: #ffffff;
+            --steel-gray: #475569;
+            --border-light: #E2E8F0;
+            --mint-green: #10B981;
+            --danger-red: #EF4444;
+            --royal-blue: #3B82F6;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #F1F5F9;
+            color: var(--slate-base);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ENTERPRISE ADMIN HEADER */
+        header {
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            color: white;
+            padding: 16px 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        header h1 span {
+            background-color: #334155;
+            color: #F57F17;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+            border: 1px solid #475569;
+        }
+
+        .btn-nav-back {
+            background-color: #334155;
+            color: #F8FAFC;
+            border: 1px solid #475569;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn-nav-back:hover {
+            background-color: #475569;
+            color: white;
+        }
+
+        /* TWO-COLUMN DASHBOARD GRID */
+        .dashboard-container {
+            max-width: 1100px;
+            width: 100%;
+            margin: 40px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 850px) {
+            .dashboard-container { grid-template-columns: 1fr; }
+        }
+
+        .panel-card {
+            background: var(--slate-card);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-card h3 {
+            margin: 0 0 6px 0;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-subtitle {
+            font-size: 13px;
+            color: #64748B;
+            margin-bottom: 25px;
+        }
+
+        /* FORM INPUT STYLES */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group { flex: 1; }
+
+        label {
+            font-weight: 700;
+            font-size: 11px;
+            color: var(--steel-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input, select {
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1.5px solid var(--border-light);
+            border-radius: 6px;
+            outline: none;
+            background-color: #F8FAFC;
+            color: var(--slate-base);
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--royal-blue);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* ADMIN CONTROL BUTTONS */
+        .admin-btn {
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+
+        .btn-construct {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 2px 8px rgba(4, 120, 87, 0.2);
+        }
+        .btn-construct:hover { background: #047857; }
+
+        .btn-link {
+            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+            box-shadow: 0 2px 8px rgba(29, 78, 216, 0.2);
+        }
+        .btn-link:hover { background: #1D4ED8; }
+
+        .btn-destroy {
+            background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+            box-shadow: 0 2px 8px rgba(185, 28, 28, 0.2);
+        }
+        .btn-destroy:hover { background: #B91C1C; }
+
+        hr {
+            border: 0;
+            border-top: 1px dashed var(--border-light);
+            margin: 24px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>RailOptix <span>Core Admin Portal</span></h1>
+        <a class="btn-nav-back" href="/">Passenger Desk View</a>
+    </header>
+
+    <div class="dashboard-container">
+        
+        <div class="panel-card">
+            <h3 style="color: #047857;">🔧 Topology Construction Core</h3>
+            <div class="panel-subtitle">Register open-ended node variables into persistent C structures.</div>
+            
+            <div class="form-group">
+                <label>Manual Station Code</label>
+                <input type="text" id="customCode" placeholder="e.g., NK, AK, MMR, NGP" maxlength="10">
+            </div>
+            <div class="form-group">
+                <label>Official Station Designation Name</label>
+                <input type="text" id="customName" placeholder="e.g., Nashik Road Junction">
+            </div>
+            <button class="admin-btn btn-construct" onclick="commitStationNode()">Commit Station Vertex</button>
+            
+            <hr>
+            
+            <div class="form-group">
+                <label>Track Source Terminal</label>
+                <select id="trackSrc"></select>
+            </div>
+            <div class="form-group">
+                <label>Track Target Destination</label>
+                <select id="trackDest"></select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Distance Weight (KM)</label>
+                    <input type="number" id="trackDist" value="50">
+                </div>
+                <div class="form-group">
+                    <label>Duration Weight (Min)</label>
+                    <input type="number" id="trackTime" value="45">
+                </div>
+            </div>
+            <button class="admin-btn btn-link" onclick="commitTrackEdge()">Stitch Weighted Edge</button>
+        </div>
+
+        <div class="panel-card">
+            <h3 style="color: #B91C1C;">⛔ Infrastructure Decommissioning</h3>
+            <div class="panel-subtitle">Sever tracking paths or delete active structural nodes from memory.</div>
+            
+            <div class="form-group">
+                <label>Target Station Node to Dismantle</label>
+                <select id="deleteStationTarget"></select>
+            </div>
+            <button class="admin-btn btn-destroy" onclick="deleteStationNode()">Wipe Station Vertex</button>
+            
+            <hr>
+            
+            <div class="form-group">
+                <label>Dismantle Track Segment — Terminal A</label>
+                <select id="deleteTrackSrc"></select>
+            </div>
+            <div class="form-group">
+                <label>Dismantle Track Segment — Terminal B</label>
+                <select id="deleteTrackDest"></select>
+            </div>
+            <button class="admin-btn btn-destroy" onclick="deleteTrackEdge()">Sever Edge Segment</button>
+        </div>
+
+    </div>
+
+    <script>
+        async function loadDeveloperSelectors() {
+            const res = await fetch('/api/list-stations');
+            const stations = await res.json();
+            
+            const selectors = [
+                document.getElementById('trackSrc'),
+                document.getElementById('trackDest'),
+                document.getElementById('deleteStationTarget'),
+                document.getElementById('deleteTrackSrc'),
+                document.getElementById('deleteTrackDest')
+            ];
+            
+            selectors.forEach(sel => sel.innerHTML = "");
+
+            stations.forEach(st => {
+                selectors.forEach(sel => {
+                    sel.options.add(new Option(`${st.name} [${st.code}]`, st.code));
+                });
+            });
+        }
+
+        async function commitStationNode() {
+            const code = document.getElementById('customCode').value.trim().toUpperCase();
+            const name = document.getElementById('customName').value.trim();
+            if(!code || !name) return alert("All fields required.");
+            
+            const res = await fetch('/api/add-station', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code, name}) });
+            if((await res.json()).success) { 
+                alert(`Node [${code}] safely saved into database.`);
+                document.getElementById('customCode').value = "";
+                document.getElementById('customName').value = "";
+                loadDeveloperSelectors(); 
+            }
+        }
+
+        async function commitTrackEdge() {
+            const fromCode = document.getElementById('trackSrc').value;
+            const toCode = document.getElementById('trackDest').value;
+            const distance = document.getElementById('trackDist').value;
+            const time = document.getElementById('trackTime').value;
+            if(fromCode === toCode) return alert("Endpoints must be distinct.");
+            
+            const res = await fetch('/api/add-track', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fromCode, toCode, distance, time}) });
+            if((await res.json()).success) alert("Track connection compiled.");
+        }
+
+        async function deleteStationNode() {
+            const code = document.getElementById('deleteStationTarget').value;
+            if(!code) return;
+            if(!confirm(`Confirm decommissioning of station [${code}]? All attached tracking paths will be stripped.`)) return;
+
+            const res = await fetch('/api/remove-station', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code}) });
+            if((await res.json()).success) { alert(`Station [${code}] purged.`); loadDeveloperSelectors(); }
+        }
+
+        async function deleteTrackEdge() {
+            const fromCode = document.getElementById('deleteTrackSrc').value;
+            const toCode = document.getElementById('deleteTrackDest').value;
+            if(fromCode === toCode) return alert("Select individual terminals.");
+            if(!confirm(`Dismantle route tracking segment between ${fromCode} and ${toCode}?`)) return;
+
+            const res = await fetch('/api/remove-track', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fromCode, toCode}) });
+            if((await res.json()).success) alert("Track connection severed.");
+        }
+
+        loadDeveloperSelectors();
+    </script>
+</body>
+</html>
